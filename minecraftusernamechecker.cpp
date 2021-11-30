@@ -57,6 +57,63 @@ string user_agent()
 }
 
 
+//Grab Random Word
+string grabword() {
+	auto curl = curl_easy_init();
+	std::string response_string;
+	std::string header_string;
+	try {
+		string url = "https://random-word-api.herokuapp.com/word?number=1";
+		//string url = "https://san-random-words.vercel.app/";
+		if (curl) {
+
+			struct curl_slist* slist1;
+			slist1 = NULL;
+			slist1 = curl_slist_append(slist1, "Content-Type: application/json");
+
+			curl_easy_setopt(curl, CURLOPT_URL, url);
+			curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
+			curl_easy_setopt(curl, CURLOPT_USERAGENT, user_agent());
+			curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);
+			curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);
+			curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
+			curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, "8000");
+			curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeFunction);
+			curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_string);
+			curl_easy_setopt(curl, CURLOPT_HEADERDATA, &header_string);
+
+			char* url;
+			double elapsed;
+			long response_code;
+			curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+			curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &elapsed);
+			curl_easy_getinfo(curl, CURLINFO_EFFECTIVE_URL, &url);
+
+			curl_easy_perform(curl);
+			curl_easy_cleanup(curl);
+			curl = NULL;
+		}
+
+		try {
+
+			nlohmann::json jsonData = nlohmann::json::parse(response_string);
+			//string word = jsonData[0]["word"];
+			string word = jsonData[0];
+			word = std::regex_replace(word, std::regex("\""), "");
+			return word;
+		}
+		catch (const std::exception& e)
+		{
+			return "UNKOWN";
+		}
+
+	}
+	catch (const std::exception& e)
+	{
+		return "UNKOWN";
+	}
+}
+
 //Check Account Status (Availbility)
 string checkusername(string username, string auth) {
 	auto curl = curl_easy_init();
@@ -260,15 +317,17 @@ int main()
 	string option;
 	cout << "[+] Select option...\n";
 	cout << "[-] 1 = Turbo from list\n";
-	cout << "[-] 2 = Check usernames from list";
+	cout << "[-] 2 = Check usernames from list\n";
+	cout << "[-] 3 = Generate random username to check (API)\n";
+	cout << "[>] Selection: ";
 	cin >> option;
 
 	string delay;
-	cout << "\n[+] Enter delay per check (in seconds): ";
+	cout << "\n[>] Enter delay per check (in seconds): ";
 	cin >> delay;
 	int delay1 = stoi(delay);
 
-	cout << "\n\n[+] Starting...";
+	cout << "\n\n[+] Starting...\n\n";
 
 	//Grabs accounts from textfile to turbo
 	if (option == "1") {
@@ -366,6 +425,61 @@ int main()
 				ifstream file("usernames.txt");
 				string content;
 				while (file >> content) {
+					string result = checkusername(content, token);
+
+					if (error >= 3) {
+						cout << "[-] Got unkown response from request... trying new account!\n";
+						break;
+					}
+
+					if (result == "UNKNOWN") {
+						cout << "[-] Got unkown response from request... sleeping for 20 seconds!\n";
+						this_thread::sleep_for(chrono::seconds(20));
+						error++;
+					}
+
+					if (result == "AVAILABLE") {
+						std::ofstream log("2_available.txt", std::ios_base::app | std::ios_base::out);
+						log << content << " - " << result << "\n";
+					}
+					else {
+						std::ofstream log("2_failed.txt", std::ios_base::app | std::ios_base::out);
+						log << content << " - " << result << "\n";
+					}
+					cout << content << " -> " << result << "\n";
+					this_thread::sleep_for(chrono::seconds(delay1));
+				}
+			}
+			else {
+				cout << "[-] Account information was invalid: " << account << " - Trying next account...\n";
+			}
+			this_thread::sleep_for(chrono::seconds(10)); //Sleep 10 seconds before trying new account
+		}
+	}
+
+	if (option == "3") {
+		ifstream file1("accounts.txt");
+		string content1;
+		while (file1 >> content1) {
+
+			int error = 1;
+
+			//Delimeter Split
+			string account = content1;
+			std::string delimiter = ":";
+			std::string email = account.substr(0, account.find(delimiter[0]));
+			std::string password = account.substr(int(email.length()), account.find(delimiter[0]));
+			password = std::regex_replace(password, std::regex(":"), "");
+
+			//Login to account
+			string token = mclogin(email, password);
+			if (token != "UNKOWN") {
+
+				//Successful signin
+				cout << "[+] Signed into " << account << "\n";
+
+				while (true) {
+					string content = grabword(); //Grab the random word! :)
 					string result = checkusername(content, token);
 
 					if (error >= 3) {
