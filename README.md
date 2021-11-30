@@ -1,8 +1,8 @@
 # Minecraft Username Checker and Turbo
-## C++
 
 Allows you to check usernames in a list on Minecraft.
 **EMAIL:PASS is only supported at this time. (I'll add Token compatibility later.)**
+**This is not to be used as a sniper.**
 
 ## Modes
 - (1) Check usernames from list and turbo if available
